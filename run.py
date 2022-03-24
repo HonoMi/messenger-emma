@@ -9,6 +9,7 @@ import torch
 from messenger.models.emma import EMMA
 from messenger.models.utils import ObservationBuffer
 
+
 def win_episode(model, env, args):
     '''
     Run the model on env for one episode and return True if the model won,
@@ -22,12 +23,13 @@ def win_episode(model, env, args):
         with torch.no_grad():
             action = model(buffer.get_obs(), manual)
         obs, reward, done, _ = env.step(action)
-        if reward == 1: # get reward of 1 only if you win the game
+        if reward == 1:  # get reward of 1 only if you win the game
             return True
         if done:
             break
         buffer.update(obs)
     return False
+
 
 def total_wins(model, env, args):
     '''
@@ -44,12 +46,28 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
 
     # general arguments
-    parser.add_argument("--model_state", required=True, type=str, help="Path to model states to evaluate.")
-    parser.add_argument("--eval_eps", default=100, type=int, help="Number of episodes to evaluate each model.")
+    parser.add_argument(
+        "--model_state",
+        required=True,
+        type=str,
+        help="Path to model states to evaluate.")
+    parser.add_argument(
+        "--eval_eps",
+        default=100,
+        type=int,
+        help="Number of episodes to evaluate each model.")
 
     # environment arguments
-    parser.add_argument("--env_id", required=True, type=str, help="Environment id used in gym.make")
-    parser.add_argument("--max_steps", default=128, type=int, help="Maximum number of steps for each episode")
+    parser.add_argument(
+        "--env_id",
+        required=True,
+        type=str,
+        help="Environment id used in gym.make")
+    parser.add_argument(
+        "--max_steps",
+        default=128,
+        type=int,
+        help="Maximum number of steps for each episode")
 
     args = parser.parse_args()
 
@@ -60,7 +78,10 @@ if __name__ == "__main__":
         args.device = torch.device("cpu")
 
     model = EMMA().to(args.device)
-    model.load_state_dict(torch.load(args.model_state, map_location=args.device))
+    model.load_state_dict(
+        torch.load(
+            args.model_state,
+            map_location=args.device))
     model.eval()
 
     env = gym.make(args.env_id)

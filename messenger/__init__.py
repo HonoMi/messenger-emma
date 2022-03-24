@@ -1,9 +1,9 @@
 from gym.envs.registration import register
 
 register(
-    id = "msgr-train-v1",
+    id="msgr-train-v1",
     entry_point="messenger.envs:TwoEnvWrapper",
-    kwargs = dict(
+    kwargs=dict(
         stage=1,
         split_1="train_mc",
         split_2="train_sc",
@@ -12,41 +12,41 @@ register(
 )
 
 register(
-    id = "msgr-train-sc-v1",
+    id="msgr-train-sc-v1",
     entry_point="messenger.envs:StageOne",
-    kwargs = dict(
+    kwargs=dict(
         split="train_sc",
     )
 )
 
 register(
-    id = "msgr-train-mc-v1",
+    id="msgr-train-mc-v1",
     entry_point="messenger.envs:StageOne",
-    kwargs = dict(
+    kwargs=dict(
         split="train_mc",
     )
 )
 
 register(
-    id = "msgr-val-v1",
+    id="msgr-val-v1",
     entry_point="messenger.envs:StageOne",
-    kwargs = dict(
+    kwargs=dict(
         split="val",
     )
 )
 
 register(
-    id = "msgr-test-v1",
+    id="msgr-test-v1",
     entry_point="messenger.envs:StageOne",
-    kwargs = dict(
+    kwargs=dict(
         split="test",
     )
 )
 
 register(
-    id = "msgr-train-v2",
+    id="msgr-train-v2",
     entry_point="messenger.envs:TwoEnvWrapper",
-    kwargs = dict(
+    kwargs=dict(
         stage=2,
         split_1="train_mc",
         split_2="train_sc",
@@ -55,49 +55,49 @@ register(
 )
 
 register(
-    id = "msgr-train-sc-v2",
+    id="msgr-train-sc-v2",
     entry_point="messenger.envs:StageTwo",
-    kwargs = dict(
+    kwargs=dict(
         split="train_sc",
     )
 )
 
 register(
-    id = "msgr-train-mc-v2",
+    id="msgr-train-mc-v2",
     entry_point="messenger.envs:StageTwo",
-    kwargs = dict(
+    kwargs=dict(
         split="train_mc",
     )
 )
 
 register(
-    id = "msgr-val-v2",
+    id="msgr-val-v2",
     entry_point="messenger.envs:StageTwo",
-    kwargs = dict(
+    kwargs=dict(
         split="val",
     )
 )
 
 register(
-    id = "msgr-test-v2",
+    id="msgr-test-v2",
     entry_point="messenger.envs:StageTwo",
-    kwargs = dict(
+    kwargs=dict(
         split="test",
     )
 )
 
 register(
-    id = "msgr-test-se-v2",
+    id="msgr-test-se-v2",
     entry_point="messenger.envs:StageTwo",
-    kwargs = dict(
+    kwargs=dict(
         split="test_se",
     )
 )
 
 register(
-    id = "msgr-train-v3",
+    id="msgr-train-v3",
     entry_point="messenger.envs:TwoEnvWrapper",
-    kwargs = dict(
+    kwargs=dict(
         stage=3,
         split_1="train_mc",
         split_2="train_sc",
@@ -106,34 +106,34 @@ register(
 )
 
 register(
-    id = "msgr-train-sc-v3",
+    id="msgr-train-sc-v3",
     entry_point="messenger.envs:StageThree",
-    kwargs = dict(
+    kwargs=dict(
         split="train_sc",
     )
 )
 
 register(
-    id = "msgr-train-mc-v3",
+    id="msgr-train-mc-v3",
     entry_point="messenger.envs:StageThree",
-    kwargs = dict(
+    kwargs=dict(
         split="train_mc",
     )
 )
 
 
 register(
-    id = "msgr-val-v3",
+    id="msgr-val-v3",
     entry_point="messenger.envs:StageThree",
-    kwargs = dict(
+    kwargs=dict(
         split="val",
     )
 )
 
 register(
-    id = "msgr-test-v3",
+    id="msgr-test-v3",
     entry_point="messenger.envs:StageThree",
-    kwargs = dict(
+    kwargs=dict(
         split="test",
     )
 )

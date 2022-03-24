@@ -6,7 +6,8 @@ import json
 from pathlib import Path
 from messenger.envs.config import NPCS, Game
 
-def get_entity(name:str):
+
+def get_entity(name: str):
     '''
     Get the Entity object for the entity with
     name name.
@@ -15,6 +16,7 @@ def get_entity(name:str):
         if entity.name == name:
             return entity
     raise Exception("entity not found.")
+
 
 def get_game(game_tuple):
     '''
@@ -27,7 +29,8 @@ def get_game(game_tuple):
     goal = get_entity(goal_name)
     return Game(enemy=enemy, message=message, goal=goal)
 
-def games_from_json(json_path:str, split:str):
+
+def games_from_json(json_path: str, split: str):
     '''
     Convert game strings in games.json to Game namedtuples
     '''

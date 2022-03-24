@@ -6,12 +6,13 @@ import messenger.envs.config as config
 
 Descr = namedtuple("Description", ['entity', 'role', 'type'])
 
+
 class TextManual:
     '''
     Class which implements methods that allow environments to construct
     text manuals for games in Messenger.
     '''
-    
+
     def __init__(self, json_path):
         with open(json_path, "r") as f:
             self.descriptors = json.load(f)
@@ -28,56 +29,67 @@ class TextManual:
             The probability of returning a descriptor that does not have
             any type information (only if entity_type is not None).
         '''
-        if random.random() < no_type_p: # no type information
+        if random.random() < no_type_p:  # no type information
             return random.choice(self.descriptors[entity][role]["unknown"])
 
         else:
             return random.choice(self.descriptors[entity][role][entity_type])
 
-    def get_document(self, enemy, message, goal, shuffle=False, 
-                enemy_type=None, message_type=None, goal_type=None,
-                append=False, delete=False, **kwargs):
+    def get_document(self, enemy, message, goal, shuffle=False,
+                     enemy_type=None, message_type=None, goal_type=None,
+                     append=False, delete=False, **kwargs):
         '''
         Makes a document for Messenger using the specified parameters.
         If no type is provided, a random type will be selected.
 
         Parameters:
-        append: 
-            If True, append an extraneous sentence to the document describing a 
+        append:
+            If True, append an extraneous sentence to the document describing a
             random object that is not in {enemy, message, goal}.
         delete: If True, Delete a random descriptor from the document.
-        shuffle: 
+        shuffle:
             If True, shuffles the order of the descriptors
         kwargs:
             All other kwargs go to get_descriptor()
         '''
 
         document = [
-            self.get_descriptor(entity=enemy, entity_type=enemy_type, role="enemy", **kwargs),
-            self.get_descriptor(entity=message, entity_type=message_type, role="message", **kwargs),
-            self.get_descriptor(entity=goal, entity_type=goal_type, role="goal", **kwargs)
-        ]
+            self.get_descriptor(
+                entity=enemy,
+                entity_type=enemy_type,
+                role="enemy",
+                **kwargs),
+            self.get_descriptor(
+                entity=message,
+                entity_type=message_type,
+                role="message",
+                **kwargs),
+            self.get_descriptor(
+                entity=goal,
+                entity_type=goal_type,
+                role="goal",
+                **kwargs)]
 
-        if delete: # delete a random descriptor
+        if delete:  # delete a random descriptor
             document = random.sample(document, 2)
 
         if append:
             # choose an object not in {enemy, message, goal}
-            valid_objs = [obj.name for obj in config.NPCS if obj.name not in [enemy, message, goal]]
+            valid_objs = [
+                obj.name for obj in config.NPCS if obj.name not in [
+                    enemy, message, goal]]
             rand_obj = random.choice(valid_objs)
             result = None
             while result is None:
                 try:
                     result = self.get_descriptor(
-                        entity=rand_obj,
-                        role=random.choice(("enemy", "message", "goal")),
-                        entity_type=random.choice(("chaser", "fleeing", "immovable")),
-                        **kwargs
-                    )
-                except:
+                        entity=rand_obj, role=random.choice(
+                            ("enemy", "message", "goal")), entity_type=random.choice(
+                            ("chaser", "fleeing", "immovable")), **kwargs)
+                except BaseException:
                     pass
             document.append(result)
-            
+
         if shuffle:
             document = random.sample(document, len(document))
 
@@ -111,9 +123,14 @@ class TextManual:
         Get a description about the entity where the entity is not of role not_of_role
         and not of type not_of_type
         '''
-        possible_roles = [x for x in ('message', 'goal', 'enemy') if x != not_of_role]
+        possible_roles = [
+            x for x in (
+                'message',
+                'goal',
+                'enemy') if x != not_of_role]
         random.shuffle(possible_roles)
-        selected_type = random.choice([x for x in ('chaser', 'fleeing', 'immovable') if x != not_of_type])
+        selected_type = random.choice(
+            [x for x in ('chaser', 'fleeing', 'immovable') if x != not_of_type])
 
         for role in possible_roles:
             try:
@@ -124,7 +141,7 @@ class TextManual:
                     no_type_p=0,
                     **kwargs
                 )
-            except:
+            except BaseException:
                 continue
         raise Exception('decoy description with impossible constraints')
 

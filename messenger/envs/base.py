@@ -51,6 +51,7 @@ class Grid:
     Class which makes it easier to build a grid observation from the dict state
     return by VGDLEnv.
     '''
+
     def __init__(self, layers, shuffle=True):
         '''
         layers:
@@ -60,18 +61,19 @@ class Grid:
             Place each items in a random order.
         '''
         self.grid = np.zeros((config.STATE_HEIGHT, config.STATE_WIDTH, layers))
-        self.order = list(range(layers)) # insertion order
+        self.order = list(range(layers))  # insertion order
         if shuffle:
             random.shuffle(self.order)
         self.layers = layers
         self.entity_count = 0
 
-    def add(self, entity:Entity, position:Position):
+    def add(self, entity: Entity, position: Position):
         '''
         Add entity entity and position position.
         '''
         assert self.entity_count < self.layers, \
             f"Tried to add entity no. {self.entity_count} with {self.layers} layers."
 
-        self.grid[position.y, position.x, self.order[self.entity_count]] = entity.id
+        self.grid[position.y, position.x,
+                  self.order[self.entity_count]] = entity.id
         self.entity_count += 1
