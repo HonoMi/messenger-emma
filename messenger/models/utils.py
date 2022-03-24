@@ -19,13 +19,17 @@ class ObservationBuffer:
         The device on which buffers are loaded into
     '''
 
-    def __init__(self, buffer_size, device):
+    def __init__(self, buffer_size, device, send_to_device=True):
         self.buffer_size = buffer_size
         self.buffer = None
         self.device = device
+        self.send_to_device = send_to_device
 
     def _np_to_tensor(self, obs):
-        return torch.from_numpy(obs).long().to(self.device)
+        if self.send_to_device:
+            return torch.from_numpy(obs).long().to(self.device)
+        else:
+            return torch.from_numpy(obs).long()
 
     def reset(self, obs):
         # initialize / reset the buffer with the observation
@@ -41,9 +45,12 @@ class ObservationBuffer:
         # get a stack of all observations currently in the buffer
         stacked_obs = {}
         for key in self.buffer[0].keys():
-            stacked_obs[key] = torch.stack(
-                [self._np_to_tensor(obs[key]) for obs in self.buffer]
-            )
+            if key == 'manual':
+                stacked_obs[key] = self.buffer[0][key]
+            else:
+                stacked_obs[key] = torch.stack(
+                    [self._np_to_tensor(obs[key]) for obs in self.buffer]
+                )
         return stacked_obs
 
 

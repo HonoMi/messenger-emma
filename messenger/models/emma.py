@@ -26,6 +26,7 @@ class EMMA(nn.Module):
             f_maps=64,
             kernel_size=2,
             n_hidden_layers=1,
+            compute_value=False,
             device=None):
 
         super().__init__()
@@ -81,6 +82,7 @@ class EMMA(nn.Module):
             nn.Softmax(dim=-2)
         )
 
+        self.compute_value = compute_value
         if device:
             self.device = device
         else:
@@ -115,7 +117,10 @@ class EMMA(nn.Module):
         weights = F.softmax(kq, dim=-1) * mask
         return torch.mean(weights.unsqueeze(-1) * value, dim=-2), weights
 
-    def forward(self, obs, manual):
+    # def forward(self, obs, manual):
+    def forward(self, obs, manual=None):
+        manual = manual or obs['manual']
+
         # encoder the text
         temb = self.encoder.encode(manual)
 
@@ -153,8 +158,12 @@ class EMMA(nn.Module):
         obs_emb = F.leaky_relu(self.conv(obs_emb)).view(-1)
 
         action_probs = self.action_layer(obs_emb)
+        value = self.value_layer(obs_emb)
 
         action = torch.argmax(action_probs).item()
         if random.random() < 0.05:  # random action with 0.05 prob
             action = random.randrange(0, self.action_dim)
-        return action
+        if self.compute_value:
+            return action, value
+        else:
+            return action

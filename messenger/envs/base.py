@@ -27,12 +27,14 @@ class MessengerEnv(gym.Env):
             "entities": spaces.Box(
                 low=0,
                 high=14,
-                shape=(config.STATE_HEIGHT, config.STATE_WIDTH, 3)
+                shape=(config.STATE_HEIGHT, config.STATE_WIDTH, 3),
+                dtype=np.float32,
             ),
             "avatar": spaces.Box(
                 low=15,
                 high=16,
-                shape=(config.STATE_HEIGHT, config.STATE_WIDTH, 1)
+                shape=(config.STATE_HEIGHT, config.STATE_WIDTH, 1),
+                dtype=np.float32,
             )
         })
 
