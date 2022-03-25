@@ -26,7 +26,6 @@ class EMMA(nn.Module):
             f_maps=64,
             kernel_size=2,
             n_hidden_layers=1,
-            compute_value=False,
             forward_type='original',
             device=None):
 
@@ -83,12 +82,10 @@ class EMMA(nn.Module):
             nn.Softmax(dim=-2)
         )
 
-        self.compute_value = compute_value
         if device:
             self.device = device
         else:
             self.device = torch.device("cpu")
-
         self.forward_type = forward_type
 
         # get the text encoder
@@ -124,6 +121,7 @@ class EMMA(nn.Module):
     def forward(self, obs, manual=None, entity=None, avatar=None):
         
         if self.forward_type == 'original':
+            # The original forward does not expect batch dimension
             if manual is None:
                 raise ValueError()
             if entity is not None:
@@ -136,16 +134,16 @@ class EMMA(nn.Module):
             temb = self.encoder.encode(manual)
 
             # add batch dimension
-            have_batch_dimension = len(entity_obs.shape) == 5
-            if not have_batch_dimension:
-                entity_obs = entity_obs.unsqueeze(0)
-                avatar_obs = avatar_obs.unsqueeze(0)
+            entity_obs = entity_obs.unsqueeze(0)
+            avatar_obs = avatar_obs.unsqueeze(0)
             temb = temb.unsqueeze(0)
         elif self.forward_type == 'pfrl':
             manual, entity_obs, avatar_obs = obs
             temb = manual
         else:
             raise ValueError()
+
+        batch_size = entity_obs.shape[0]
 
         # embedding for the avatar object, which will not attend to text
         avatar_emb = nonzero_mean(self.sprite_emb(avatar_obs))
@@ -158,31 +156,32 @@ class EMMA(nn.Module):
         key = self.txt_key(temb)
         key_scale = self.scale_key(temb)  # (num sent, sent_len, 1)
         key = key * key_scale
-        key = torch.sum(key, dim=1)
+        key = torch.sum(key, dim=-2)
 
         value = self.txt_val(temb)
         val_scale = self.scale_val(temb)
         value = value * val_scale
-        value = torch.sum(value, dim=1)
+        value = torch.sum(value, dim=-2)
 
-        obs_emb, weights = self.attention(query, key, value)
+        obs_emb, _ = self.attention(query, key, value)
 
         # compress the channels from KHWC to HWC' where K is history length
-        obs_emb = obs_emb.view(self.state_h, self.state_w, -1)
-        avatar_emb = avatar_emb.view(self.state_h, self.state_w, -1)
+        obs_emb = obs_emb.view(batch_size, self.state_h, self.state_w, -1)
+        avatar_emb = avatar_emb.view(batch_size, self.state_h, self.state_w, -1)
         obs_emb = (obs_emb + avatar_emb) / 2.0
 
         # permute from HWC to NCHW and do convolution
-        obs_emb = obs_emb.permute(2, 0, 1).unsqueeze(0)
-        obs_emb = F.leaky_relu(self.conv(obs_emb)).view(-1)
+        obs_emb = obs_emb.permute(0, 3, 1, 2)
+        obs_emb = F.leaky_relu(self.conv(obs_emb)).reshape(batch_size, -1)
 
         action_probs = self.action_layer(obs_emb)
         value = self.value_layer(obs_emb)
 
-        action = torch.argmax(action_probs).item()
-        if random.random() < 0.05:  # random action with 0.05 prob
-            action = random.randrange(0, self.action_dim)
-        if self.compute_value:
-            return action, value
-        else:
-            return action
+        actions = torch.argmax(action_probs, dim=1)
+        if random.random() < 0.05:  # random actions with 0.05 prob
+            actions = [random.randrange(0, self.action_dim)
+                       for _ in range(0, batch_size)]
+        if self.forward_type == 'original':
+            return actions[0]
+        elif self.forward_type == 'pfrl':
+            return actions, value
