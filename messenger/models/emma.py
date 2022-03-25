@@ -115,7 +115,8 @@ class EMMA(nn.Module):
         mask = (kq != 0)  # keep zeroed-out entries zero
         kq = kq / self.attn_scale  # scale to prevent vanishing grads
         weights = F.softmax(kq, dim=-1) * mask
-        return torch.mean(weights.unsqueeze(-1) * value, dim=-2), weights
+        weighted_vals = weights.unsqueeze(-1) * value.unsqueeze(1).unsqueeze(1).unsqueeze(1)
+        return torch.mean(weighted_vals, dim=-2), weights
 
     # def forward(self, obs, manual):
     def forward(self, obs, manual=None, entity=None, avatar=None):
@@ -177,11 +178,13 @@ class EMMA(nn.Module):
         action_probs = self.action_layer(obs_emb)
         value = self.value_layer(obs_emb)
 
-        actions = torch.argmax(action_probs, dim=1)
-        if random.random() < 0.05:  # random actions with 0.05 prob
-            actions = [random.randrange(0, self.action_dim)
-                       for _ in range(0, batch_size)]
         if self.forward_type == 'original':
+            actions = torch.argmax(action_probs, dim=1)
+            if random.random() < 0.05:  # random actions with 0.05 prob
+                actions = [random.randrange(0, self.action_dim)
+                           for _ in range(0, batch_size)]
             return actions[0]
         elif self.forward_type == 'pfrl':
-            return actions, value
+            return action_probs, value
+        else:
+            raise ValueError()
