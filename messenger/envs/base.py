@@ -44,6 +44,12 @@ class MessengerEnv(gym.Env):
     def step(self):
         raise NotImplementedError
 
+    def seed(self, seed):
+        np.random.seed(seed)
+        random.seed(seed)
+        # torch.manual_seed(seed)
+        # torch.cuda.manual_seed(seed)
+
     def render(self):
         raise NotImplementedError
 
