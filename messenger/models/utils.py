@@ -1,6 +1,7 @@
 '''
 Common code and utilities used by the models
 '''
+from typing import List
 
 import torch
 
@@ -88,7 +89,7 @@ class Encoder:
             tok_device[key] = tokens[key].to(self.device)
         return tok_device
 
-    def encode(self, text):
+    def encode(self, text: List[str]):
         '''
         Encodes the text using self.encoder and self.tokenizer. Text should be
         a list of sents, where sent is a string.

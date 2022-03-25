@@ -27,6 +27,7 @@ class EMMA(nn.Module):
             kernel_size=2,
             n_hidden_layers=1,
             compute_value=False,
+            forward_type='original',
             device=None):
 
         super().__init__()
@@ -88,6 +89,8 @@ class EMMA(nn.Module):
         else:
             self.device = torch.device("cpu")
 
+        self.forward_type = forward_type
+
         # get the text encoder
         text_model = AutoModel.from_pretrained("bert-base-uncased")
         tokenizer = AutoTokenizer.from_pretrained("bert-base-uncased")
@@ -100,7 +103,7 @@ class EMMA(nn.Module):
     def to(self, device):
         '''
         Override the .to() method so that we can store the device as an attribute
-        and also update the device for self.encoder (which does not inherit nn.Module)
+        and also update the device for self.ncoder (which does not inherit nn.Module)
         '''
         self.device = device
         self.encoder.to(device)
@@ -111,22 +114,38 @@ class EMMA(nn.Module):
         Cell by cell attention mechanism. Uses the sprite embeddings as query. Key is
         text embeddings
         '''
-        kq = query @ key.t()  # dot product attention
+        kq = query @ key.transpose(1, 2).unsqueeze(1).unsqueeze(1)
         mask = (kq != 0)  # keep zeroed-out entries zero
         kq = kq / self.attn_scale  # scale to prevent vanishing grads
         weights = F.softmax(kq, dim=-1) * mask
         return torch.mean(weights.unsqueeze(-1) * value, dim=-2), weights
 
     # def forward(self, obs, manual):
-    def forward(self, obs, manual=None):
-        manual = manual or obs['manual']
+    def forward(self, obs, manual=None, entity=None, avatar=None):
+        
+        if self.forward_type == 'original':
+            if manual is None:
+                raise ValueError()
+            if entity is not None:
+                raise ValueError()
+            if avatar is not None:
+                raise ValueError()
 
-        # encoder the text
-        temb = self.encoder.encode(manual)
+            entity_obs = obs["entities"]
+            avatar_obs = obs["avatar"]
+            temb = self.encoder.encode(manual)
 
-        # split the observation tensor into objects and avatar
-        entity_obs = obs["entities"]
-        avatar_obs = obs["avatar"]
+            # add batch dimension
+            have_batch_dimension = len(entity_obs.shape) == 5
+            if not have_batch_dimension:
+                entity_obs = entity_obs.unsqueeze(0)
+                avatar_obs = avatar_obs.unsqueeze(0)
+            temb = temb.unsqueeze(0)
+        elif self.forward_type == 'pfrl':
+            manual, entity_obs, avatar_obs = obs
+            temb = manual
+        else:
+            raise ValueError()
 
         # embedding for the avatar object, which will not attend to text
         avatar_emb = nonzero_mean(self.sprite_emb(avatar_obs))
