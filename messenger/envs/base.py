@@ -50,7 +50,7 @@ class MessengerEnv(gym.Env):
         # torch.manual_seed(seed)
         # torch.cuda.manual_seed(seed)
 
-    def render(self):
+    def render(self, mode):
         raise NotImplementedError
 
 
