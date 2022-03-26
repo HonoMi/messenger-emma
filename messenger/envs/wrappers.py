@@ -44,3 +44,6 @@ class TwoEnvWrapper(MessengerEnv):
 
     def step(self, action):
         return self.cur_env.step(action)
+
+    def render(self, mode='human'):
+        return self.cur_env.render(mode=mode)

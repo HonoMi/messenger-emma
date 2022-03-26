@@ -85,6 +85,10 @@ class StageOne(MessengerEnv):
         self.neutral = None
         self.goal = None
 
+        self._current_obs = None
+        self._current_manual = None
+        self._reward_history = []
+
     def _get_manual(self):
         enemy_str = random.choice(self.descriptors[self.enemy.name]["enemy"])
         key_str = random.choice(self.descriptors[self.message.name]["message"])
@@ -141,6 +145,10 @@ class StageOne(MessengerEnv):
 
         obs = self._get_obs()
         manual = self._get_manual()
+
+        self._current_obs = obs
+        self._current_manual = manual
+        self._reward_history = []
 
         return obs, manual
 
@@ -204,22 +212,34 @@ class StageOne(MessengerEnv):
         self._move_avatar(action)
         obs = self._get_obs()
         if self._overlap(self.avatar, self.enemy):
+            self._current_obs = obs
+            self._reward_history.append(-1.0)
             return obs, -1.0, True, None  # state, reward, done, info
 
         if self._overlap(self.avatar, self.message):
             if self.avatar.name == config.WITH_MESSAGE.name:
+                self._current_obs = obs
+                self._reward_history.append(-1.0)
                 return obs, -1.0, True, None
             elif self.avatar.name == config.NO_MESSAGE.name:
+                self._current_obs = obs
+                self._reward_history.append(1.0)
                 return obs, 1.0, True, None
             else:
                 raise Exception("Unknown avatar name {avatar.name}")
 
         if self._overlap(self.avatar, self.goal):
             if self.avatar.name == config.WITH_MESSAGE.name:
+                self._current_obs = obs
+                self._reward_history.append(1.0)
                 return obs, 1.0, True, None
             elif self.avatar.name == config.NO_MESSAGE.name:
+                self._current_obs = obs
+                self._reward_history.append(-1.0)
                 return obs, -1.0, True, None
             else:
                 raise Exception("Unknown avatar name {avatar.name}")
 
+        self._current_obs = obs
+        self._reward_history.append(0.0)
         return obs, 0.0, False, None

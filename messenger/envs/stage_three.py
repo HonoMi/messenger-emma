@@ -88,6 +88,10 @@ class StageThree(MessengerEnv):
             "with_message"]
         self.env = None  # the VGDLEnv
 
+        self._current_obs = None
+        self._current_manual = None
+        self._reward_history = []
+
     def _get_variant(self, variant_file: Path) -> GameVariant:
         '''
         Return the GameVariant for the variant specified by variant_file.
@@ -225,8 +229,17 @@ class StageThree(MessengerEnv):
         if self.shuffle_obs:
             random.shuffle(manual)
 
-        return self._convert_obs(vgdl_obs), manual
+        obs = self._convert_obs(vgdl_obs)
+
+        self._current_obs = obs
+        self._current_manual = manual
+        self._reward_history = []
+
+        return obs, manual
 
     def step(self, action):
         vgdl_obs, reward, done, info = self.env.step(action)
-        return self._convert_obs(vgdl_obs), reward, done, info
+        obs = self._convert_obs(vgdl_obs)
+        self._current_obs = obs
+        self._reward_history.append(reward)
+        return obs, reward, done, info

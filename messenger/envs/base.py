@@ -1,10 +1,13 @@
 import random
 from collections import namedtuple
+from typing import List, Optional
 
+import torch
 import gym
 from gym import spaces
 import numpy as np
 
+import messenger
 import messenger.envs.config as config
 from messenger.envs.config import Entity
 
@@ -38,6 +41,13 @@ class MessengerEnv(gym.Env):
             )
         })
 
+        # FIXME: the following may affect globally
+        np.set_printoptions(formatter={'int': self._numpy_formatter})
+
+        self._current_obs: Optional[torch.Tensor] = None
+        self._current_manual: Optional[List[str]] = None
+        self._reward_history: List[str] = []
+
     def reset(self):
         raise NotImplementedError
 
@@ -50,8 +60,67 @@ class MessengerEnv(gym.Env):
         # torch.manual_seed(seed)
         # torch.cuda.manual_seed(seed)
 
-    def render(self, mode):
-        raise NotImplementedError
+    def render(self, mode='human'):
+        str_repr = '\n'.join([
+            self._get_terminal_clear_str(),
+            self._get_instructions(),
+            self._get_obs_str(self._current_obs),
+            self._get_manual_str(self._current_manual),
+            self._get_reward_str(self._reward_history),
+        ])
+        if mode == 'human':
+            print(str_repr)
+            return None
+        elif mode == 'rgb_array':
+            raise NotImplementedError()
+        elif mode == 'ansi':
+            return str_repr
+        else:
+            raise ValueError()
+
+    def _numpy_formatter(self, i: int):
+        ''' Format function passed to numpy print to make things pretty.
+        '''
+        id_map = {}
+        for ent in messenger.envs.config.ALL_ENTITIES:
+            id_map[ent.id] = ent.name[:2].upper()
+        id_map[0] = '  '
+        id_map[15] = 'A0'
+        id_map[16] = 'AM'
+        if i < 17:
+            return id_map[i]
+        else:
+            return 'XX'
+
+    def _get_instructions(self,) -> str:
+        return '\n'.join([
+            '\nMESSENGER\n',
+            'Read the manual to get the message and bring it to the goal.',
+            'A0 is you (agent) without the message, and AM is you with the message.',
+            'The following is the symbol legend (symbol : entity)\n',
+            '\n'.join([f'{ent.name[:2].upper()} : {ent.name}' for ent in messenger.envs.config.ALL_ENTITIES[:12]]),
+            '\nNote when entities overlap the symbol might not make sense. Good luck!\n',
+        ])
+
+    def _get_obs_str(self, obs) -> str:
+        grid = np.concatenate((obs['entities'], obs['avatar']), axis=-1)
+        str_repr = str(np.sum(grid, axis=-1).astype('uint8'))
+        return str_repr
+
+    def _get_manual_str(self, manual: List[str]) -> str:
+        man_str = f'Manual: {manual[0]}\n'
+        for description in manual[1:]:
+            man_str += f'        {description}\n'
+        return man_str
+
+    def _get_reward_str(self, reward_histroy: List[float]) -> str:
+        if len(reward_histroy) == 0:
+            return f'Reward:    current={"-":<4}    sum: {sum(reward_histroy):.2f}'
+        else:
+            return f'Reward:    current={reward_histroy[-1]:.2f}    sum: {sum(reward_histroy):.2f}'
+
+    def _get_terminal_clear_str(self,) -> str:
+        return '\033c\033[3J'
 
 
 class Grid:
