@@ -121,14 +121,18 @@ class MessengerEnv(gym.Env):
 
     def _get_action_str(self, action_history: List[int]) -> str:
         action_map = {0: '^', 1: '_', 2: '<', 3: '>', 4: '*'}
-        action_str_seq = ''.join([action_map[action] for action in action_history])
-        return f'actions: {action_str_seq}'
+        format_ = ''.join([f'{{{idx}:>6}}' for idx in range(len(action_history))])
+        action_strs = [action_map[action] for action in action_history]
+        return f'actions : {format_.format(*action_strs)}'
 
     def _get_reward_str(self, reward_histroy: List[float]) -> str:
-        if len(reward_histroy) == 0:
-            return f'Reward:    current={"-":<4}    sum: {sum(reward_histroy):.2f}'
-        else:
-            return f'Reward:    current={reward_histroy[-1]:.2f}    sum: {sum(reward_histroy):.2f}'
+        format_ = ''.join([f'{{{idx}:>6.2f}}' for idx in range(len(reward_histroy))])
+        # if len(reward_histroy) >= 1:
+        #     print(format_)
+        #     raise
+        return f'rewards : {format_.format(*reward_histroy)}'\
+            + '\n'\
+            + f'return  : {sum(reward_histroy):>6.2f}'
 
     def _get_terminal_clear_str(self,) -> str:
         return '\033c\033[3J'
