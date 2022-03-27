@@ -1,6 +1,6 @@
 import random
 from collections import namedtuple
-from typing import List, Optional
+from typing import List, Optional, Dict
 
 import torch
 import gym
@@ -44,8 +44,10 @@ class MessengerEnv(gym.Env):
         # FIXME: the following may affect globally
         np.set_printoptions(formatter={'int': self._numpy_formatter})
 
-        self._current_obs: Optional[torch.Tensor] = None
+        # TODO: Move to the common operations about history from sub classes to this class, or implement as wrapper
         self._current_manual: Optional[List[str]] = None
+        self._obs_history: List[Dict[str, torch.Tensor]] = []
+        self._action_history: List[int] = []
         self._reward_history: List[str] = []
 
     def reset(self):
@@ -64,8 +66,9 @@ class MessengerEnv(gym.Env):
         str_repr = '\n'.join([
             self._get_terminal_clear_str(),
             self._get_instructions(),
-            self._get_obs_str(self._current_obs),
+            self._get_obs_str(self._obs_history),
             self._get_manual_str(self._current_manual),
+            self._get_action_str(self._action_history),
             self._get_reward_str(self._reward_history),
         ])
         if mode == 'human':
@@ -102,8 +105,11 @@ class MessengerEnv(gym.Env):
             '\nNote when entities overlap the symbol might not make sense. Good luck!\n',
         ])
 
-    def _get_obs_str(self, obs) -> str:
-        grid = np.concatenate((obs['entities'], obs['avatar']), axis=-1)
+    def _get_obs_str(self, obs_history: List[Dict[str, torch.Tensor]]) -> str:
+        if len(obs_history) == 0:
+            return ''
+        current_obs = obs_history[-1]
+        grid = np.concatenate((current_obs['entities'], current_obs['avatar']), axis=-1)
         str_repr = str(np.sum(grid, axis=-1).astype('uint8'))
         return str_repr
 
@@ -112,6 +118,11 @@ class MessengerEnv(gym.Env):
         for description in manual[1:]:
             man_str += f'        {description}\n'
         return man_str
+
+    def _get_action_str(self, action_history: List[int]) -> str:
+        action_map = {0: '^', 1: '_', 2: '<', 3: '>', 4: '*'}
+        action_str_seq = ''.join([action_map[action] for action in action_history])
+        return f'actions: {action_str_seq}'
 
     def _get_reward_str(self, reward_histroy: List[float]) -> str:
         if len(reward_histroy) == 0:

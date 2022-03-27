@@ -10,6 +10,7 @@ import torch.nn.functional as F
 from torch.distributions import Categorical
 from numpy import sqrt as sqrt
 from transformers import AutoModel, AutoTokenizer
+from tenacity import retry, stop_after_attempt, wait_random
 
 from messenger.models.utils import nonzero_mean, Encoder
 
@@ -89,13 +90,21 @@ class EMMA(nn.Module):
         self.forward_type = forward_type
 
         # get the text encoder
-        text_model = AutoModel.from_pretrained("bert-base-uncased")
-        tokenizer = AutoTokenizer.from_pretrained("bert-base-uncased")
+        text_model = self._load_transformer_model('bert-base-uncased')
+        tokenizer = self._load_transformer_tokenizer('bert-base-uncased')
         self.encoder = Encoder(
             model=text_model,
             tokenizer=tokenizer,
             device=self.device)
         self.to(device)
+
+    @retry(stop=stop_after_attempt(10), wait=wait_random(5, 30))
+    def _load_transformer_model(self, name: str):
+        return AutoModel.from_pretrained(name)
+
+    @retry(stop=stop_after_attempt(10), wait=wait_random(5, 30))
+    def _load_transformer_tokenizer(self, name: str):
+        return AutoTokenizer.from_pretrained(name)
 
     def to(self, device):
         '''

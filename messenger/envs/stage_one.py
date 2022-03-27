@@ -2,11 +2,11 @@
 Classes that follows a gym-like interface and implements stage one of the Messenger
 environment.
 '''
-
 import json
 import random
 from collections import namedtuple
 from pathlib import Path
+from typing import List
 
 import numpy as np
 
@@ -85,8 +85,9 @@ class StageOne(MessengerEnv):
         self.neutral = None
         self.goal = None
 
-        self._current_obs = None
+        self._obs_history = []
         self._current_manual = None
+        self._action_history: List[float] = []
         self._reward_history = []
 
     def _get_manual(self):
@@ -146,7 +147,8 @@ class StageOne(MessengerEnv):
         obs = self._get_obs()
         manual = self._get_manual()
 
-        self._current_obs = obs
+        self._obs_history = [obs]
+        self._action_history = []
         self._current_manual = manual
         self._reward_history = []
 
@@ -209,20 +211,22 @@ class StageOne(MessengerEnv):
             return False
 
     def step(self, action):
+        self._action_history.append(action)
+
         self._move_avatar(action)
         obs = self._get_obs()
         if self._overlap(self.avatar, self.enemy):
-            self._current_obs = obs
+            self._obs_history.append(obs)
             self._reward_history.append(-1.0)
             return obs, -1.0, True, None  # state, reward, done, info
 
         if self._overlap(self.avatar, self.message):
             if self.avatar.name == config.WITH_MESSAGE.name:
-                self._current_obs = obs
+                self._obs_history.append(obs)
                 self._reward_history.append(-1.0)
                 return obs, -1.0, True, None
             elif self.avatar.name == config.NO_MESSAGE.name:
-                self._current_obs = obs
+                self._obs_history.append(obs)
                 self._reward_history.append(1.0)
                 return obs, 1.0, True, None
             else:
@@ -230,16 +234,16 @@ class StageOne(MessengerEnv):
 
         if self._overlap(self.avatar, self.goal):
             if self.avatar.name == config.WITH_MESSAGE.name:
-                self._current_obs = obs
+                self._obs_history.append(obs)
                 self._reward_history.append(1.0)
                 return obs, 1.0, True, None
             elif self.avatar.name == config.NO_MESSAGE.name:
-                self._current_obs = obs
+                self._obs_history.append(obs)
                 self._reward_history.append(-1.0)
                 return obs, -1.0, True, None
             else:
                 raise Exception("Unknown avatar name {avatar.name}")
 
-        self._current_obs = obs
+        self._obs_history.append(obs)
         self._reward_history.append(0.0)
         return obs, 0.0, False, None

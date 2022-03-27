@@ -17,12 +17,16 @@ def win_episode(model, env, args):
     '''
     buffer = ObservationBuffer(buffer_size=3, device=args.device)
     obs, manual = env.reset()
+    if args.render:
+        env.render()
     buffer.reset(obs)
 
     for t in range(args.max_steps):
         with torch.no_grad():
             action = model(buffer.get_obs(), manual)
         obs, reward, done, _ = env.step(action)
+        if args.render:
+            env.render()
         if reward == 1:  # get reward of 1 only if you win the game
             return True
         if done:
@@ -68,6 +72,10 @@ if __name__ == "__main__":
         default=128,
         type=int,
         help="Maximum number of steps for each episode")
+    parser.add_argument(
+        "--render",
+        action='store_true',
+    )
 
     args = parser.parse_args()
 

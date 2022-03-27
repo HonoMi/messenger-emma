@@ -2,6 +2,7 @@
 Classes that follows a gym-like interface and implements stage two of the Messenger
 environment.
 '''
+from typing import List
 
 from messenger.envs.utils import games_from_json
 from messenger.envs.manual import TextManual
@@ -86,8 +87,9 @@ class StageTwo(MessengerEnv):
             "with_message"]
         self.env = None  # the VGDLEnv
 
-        self._current_obs = None
+        self._obs_history = []
         self._current_manual = None
+        self._action_history: List[int] = []
         self._reward_history = []
 
     def _get_variant(self, variant_file: Path) -> GameVariant:
@@ -199,15 +201,17 @@ class StageTwo(MessengerEnv):
 
         obs = self._convert_obs(vgdl_obs)
 
-        self._current_obs = obs
+        self._obs_history = [obs]
         self._current_manual = manual
         self._reward_history = []
 
         return obs, manual
 
     def step(self, action):
+        self._action_history.append(action)
+
         vgdl_obs, reward, done, info = self.env.step(action)
         obs = self._convert_obs(vgdl_obs)
-        self._current_obs = obs
+        self._obs_history.append(obs)
         self._reward_history.append(reward)
         return obs, reward, done, info
