@@ -48,7 +48,7 @@ class MessengerEnv(gym.Env):
         self._current_manual: Optional[List[str]] = None
         self._obs_history: List[Dict[str, torch.Tensor]] = []
         self._action_history: List[int] = []
-        self._reward_history: List[str] = []
+        self._reward_history: List[float] = []
 
     def reset(self):
         raise NotImplementedError
@@ -95,7 +95,7 @@ class MessengerEnv(gym.Env):
         else:
             return 'XX'
 
-    def _get_instructions(self,) -> str:
+    def _get_instructions(self) -> str:
         return '\n'.join([
             '\nMESSENGER\n',
             'Read the manual to get the message and bring it to the goal.',
@@ -127,9 +127,6 @@ class MessengerEnv(gym.Env):
 
     def _get_reward_str(self, reward_histroy: List[float]) -> str:
         format_ = ''.join([f'{{{idx}:>6.2f}}' for idx in range(len(reward_histroy))])
-        # if len(reward_histroy) >= 1:
-        #     print(format_)
-        #     raise
         return f'rewards : {format_.format(*reward_histroy)}'\
             + '\n'\
             + f'return  : {sum(reward_histroy):>6.2f}'

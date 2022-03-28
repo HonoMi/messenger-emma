@@ -88,7 +88,7 @@ class StageOne(MessengerEnv):
         self._obs_history = []
         self._current_manual = None
         self._action_history: List[float] = []
-        self._reward_history = []
+        self._reward_history: List[float] = []
 
     def _get_manual(self):
         enemy_str = random.choice(self.descriptors[self.enemy.name]["enemy"])

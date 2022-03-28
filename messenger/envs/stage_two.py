@@ -90,7 +90,7 @@ class StageTwo(MessengerEnv):
         self._obs_history = []
         self._current_manual = None
         self._action_history: List[int] = []
-        self._reward_history = []
+        self._reward_history: List[float] = []
 
     def _get_variant(self, variant_file: Path) -> GameVariant:
         '''
