@@ -71,7 +71,7 @@ class Encoder:
             model,
             tokenizer,
             device: torch.device,
-            max_length: int = 36):
+            max_length: int = 50):
         self.encoder = model.to(device)
         self.tokenizer = tokenizer
         self.device = device
