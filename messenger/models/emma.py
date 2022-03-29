@@ -28,7 +28,8 @@ class EMMA(nn.Module):
             kernel_size=2,
             n_hidden_layers=1,
             forward_type='original',
-            device=None):
+            # device=None
+    ):
 
         super().__init__()
 
@@ -83,10 +84,10 @@ class EMMA(nn.Module):
             nn.Softmax(dim=-2)
         )
 
-        if device:
-            self.device = device
-        else:
-            self.device = torch.device("cpu")
+        # if device:
+        #     self.device = device
+        # else:
+        #     self.device = torch.device("cpu")
         self.forward_type = forward_type
 
         # get the text encoder
@@ -95,8 +96,10 @@ class EMMA(nn.Module):
         self.encoder = Encoder(
             model=text_model,
             tokenizer=tokenizer,
-            device=self.device)
-        self.to(device)
+            # device=self.device
+            device='cpu',
+        )
+        # self.to(device)
 
     @retry(stop=stop_after_attempt(10), wait=wait_random(5, 30))
     def _load_transformer_model(self, name: str):
@@ -106,14 +109,14 @@ class EMMA(nn.Module):
     def _load_transformer_tokenizer(self, name: str):
         return AutoTokenizer.from_pretrained(name)
 
-    def to(self, device):
-        '''
-        Override the .to() method so that we can store the device as an attribute
-        and also update the device for self.ncoder (which does not inherit nn.Module)
-        '''
-        self.device = device
-        self.encoder.to(device)
-        return super().to(device)
+    # def to(self, device):
+    #     '''
+    #     Override the .to() method so that we can store the device as an attribute
+    #     and also update the device for self.ncoder (which does not inherit nn.Module)
+    #     '''
+    #     # self.device = device
+    #     self.encoder.to(device)
+    #     return super().to(device)
 
     def attention(self, query, key, value):
         '''
@@ -141,12 +144,16 @@ class EMMA(nn.Module):
 
             entity_obs = obs["entities"]
             avatar_obs = obs["avatar"]
+
+            if str(self.encoder.device) != str(avatar_obs.device):
+                self.encoder = self.encoder.to(avatar_obs.device)
             temb = self.encoder.encode(manual)
 
             # add batch dimension
             entity_obs = entity_obs.unsqueeze(0)
             avatar_obs = avatar_obs.unsqueeze(0)
             temb = temb.unsqueeze(0)
+
         elif self.forward_type == 'pfrl':
             manual, entity_obs, avatar_obs = obs
             temb = manual
