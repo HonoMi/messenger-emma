@@ -15,8 +15,7 @@ setuptools.setup(
         'vgdl@git+https://github.com/HonoMi/py-vgdl.git@honoka_dev',
         'pygame',
         'tenacity',
+        'transformers>=4.2',
+        'torch>=1.3',
     ],
-    extras_require={
-        'models': ['torch>=1.3', 'transformers>=4.2']
-    }
 )
