@@ -18,6 +18,21 @@ from self_attention_cv.pos_embeddings import PositionalEncodingSin
 from messenger.models.utils import nonzero_mean, Encoder
 
 
+class AttnVec(nn.Module):
+
+    def __init__(self, input_dim: int, emb_dim: int):
+        super().__init__()
+        self.emb = nn.Linear(input_dim, emb_dim)
+        self.scale = nn.Sequential(nn.Linear(input_dim, 1), nn.Softmax(dim=-2))
+
+    def forward(self, emb: torch.Tensor):
+        attn_emb = self.emb(emb)
+        scale = self.scale(emb)
+        scaled_emb = attn_emb * scale
+        scaled_emb = torch.sum(scaled_emb, dim=-2)
+        return scaled_emb
+
+
 class EMMA(nn.Module):
     def __init__(
             self,
@@ -32,11 +47,13 @@ class EMMA(nn.Module):
             n_hidden_layers=1,
             forward_type='original',
             do_image_self_attention=False,
-            image_self_attention_heads=4,
+            do_text_attention_after_conv=False,
+            n_image_self_attention_heads=4,
             # device=None
     ):
 
         super().__init__()
+        bert_emb_dim = 768
 
         # calculate dimensions after flattening the conv layer output
         lin_dim = f_maps * (state_h - (kernel_size - 1)) * (
@@ -46,20 +63,20 @@ class EMMA(nn.Module):
             f_maps,
             kernel_size)  # conv layer
 
-        self.do_image_self_attention = do_image_self_attention
-        if self.do_image_self_attention:
-            self.image_self_attention = MultiHeadSelfAttention(dim=f_maps, heads=image_self_attention_heads)
+        self.do_image_self_attn = do_image_self_attention
+        if self.do_image_self_attn:
+            self.image_self_attn = MultiHeadSelfAttention(dim=f_maps, heads=n_image_self_attention_heads)
 
-            num_image_tokens = (state_h - 1) * (state_w - 1)
-            self.image_pos_emb = PositionalEncodingSin(dim=f_maps, max_tokens=num_image_tokens)
+            n_image_tokens = (state_h - 1) * (state_w - 1)
+            self.image_pos_emb = PositionalEncodingSin(dim=f_maps, max_tokens=n_image_tokens)
             # The output tensor shape of the following classes are somewhat unexpected.
-            # self.image_pos_emb = RelPosEmb1D(tokens = num_image_tokens,
+            # self.image_pos_emb = RelPosEmb1D(tokens = n_image_tokens,
             #                                  dim_head=f_maps,
             #                                  heads=1)
-            # self.image_pos_emb = AbsPosEmb1D(tokens = num_image_tokens,
+            # self.image_pos_emb = AbsPosEmb1D(tokens = n_image_tokens,
             #                                  dim_head=f_maps)
         else:
-            self.image_self_attention = None
+            self.image_self_attn = None
             self.image_pos_emb = None
 
         self.state_h = state_h
@@ -92,18 +109,23 @@ class EMMA(nn.Module):
             nn.Linear(n_latent_var, 1)
         )
 
-        # key value transforms
-        self.txt_key = nn.Linear(768, emb_dim)
-        self.scale_key = nn.Sequential(
-            nn.Linear(768, 1),
-            nn.Softmax(dim=-2)
-        )
+        def build_attn_linear(input_dim: int, output_dim: int):
+            return nn.Linear(input_dim, output_dim)
 
-        self.txt_val = nn.Linear(768, emb_dim)
-        self.scale_val = nn.Sequential(
-            nn.Linear(768, 1),
-            nn.Softmax(dim=-2)
-        )
+        def build_attn_scale(input_dim: int):
+            return nn.Sequential(nn.Linear(input_dim, 1), nn.Softmax(dim=-2))
+
+        # key value transforms
+        self.txt_attn_key = AttnVec(bert_emb_dim, emb_dim)
+        self.txt_attn_val = AttnVec(bert_emb_dim, emb_dim)
+
+        self.do_text_attention_after_conv = do_text_attention_after_conv
+        if self.do_text_attention_after_conv:
+            self.txt_attn_after_conv_key = AttnVec(bert_emb_dim, f_maps)
+            self.txt_attn_after_conv_val = AttnVec(bert_emb_dim, f_maps)
+        else:
+            self.txt_attn_after_conv_key = None
+            self.txt_attn_after_conv_val = None
 
         # if device:
         #     self.device = device
@@ -191,16 +213,8 @@ class EMMA(nn.Module):
         query = nonzero_mean(self.sprite_emb(entity_obs))
 
         # Attention
-        key = self.txt_key(temb)
-        key_scale = self.scale_key(temb)  # (num sent, sent_len, 1)
-        key = key * key_scale
-        key = torch.sum(key, dim=-2)
-
-        value = self.txt_val(temb)
-        val_scale = self.scale_val(temb)
-        value = value * val_scale
-        value = torch.sum(value, dim=-2)
-
+        key = self.txt_attn_key(temb)
+        value = self.txt_attn_val(temb)
         obs_emb, _ = self.attention(query, key, value)
 
         # compress the channels from KHWC to HWC' where K is history length
@@ -212,11 +226,18 @@ class EMMA(nn.Module):
         obs_emb = obs_emb.permute(0, 3, 1, 2)
         obs_emb = F.leaky_relu(self.conv(obs_emb))
 
-        if self.do_image_self_attention:
+        if self.do_image_self_attn:
             obs_token_embs = obs_emb.view(obs_emb.shape[0], obs_emb.shape[1], -1).permute(0, 2, 1)
             obs_token_embs = self.image_pos_emb(obs_token_embs)
-            obs_token_embs = self.image_self_attention(obs_token_embs)
+            obs_token_embs = self.image_self_attn(obs_token_embs)
             obs_emb = obs_token_embs.permute(0, 2, 1).reshape(*obs_emb.shape)
+
+        if self.do_text_attention_after_conv:
+            key = self.txt_attn_after_conv_key(temb)
+            value = self.txt_attn_after_conv_val(temb)
+            obs_emb = obs_emb.permute(0, 2, 3, 1).unsqueeze(1)    # channel last add pseudo channel dim
+            obs_emb, _ = self.attention(obs_emb, key, value)
+            obs_emb.squeeze(1).permute(0, 3, 1, 2)
 
         obs_emb = obs_emb.reshape(batch_size, -1)
         action_probs = self.action_layer(obs_emb)
