@@ -47,8 +47,10 @@ class EMMA(nn.Module):
             n_hidden_layers=1,
             forward_type='original',
             do_image_self_attention=False,
-            do_text_attention_after_conv=False,
             n_image_self_attention_heads=4,
+            do_text_attention_after_conv=False,
+            do_contrastive_learning=False,
+            tf_writer=None,
             # device=None
     ):
 
@@ -144,6 +146,23 @@ class EMMA(nn.Module):
         )
         # self.to(device)
 
+        self.do_contrastive_learning = do_contrastive_learning
+        if self.do_contrastive_learning:
+            self.contrastive_layer = nn.Sequential(
+                nn.Linear(lin_dim, n_latent_var),
+                nn.LeakyReLU(),
+                *hidden_layers,
+                nn.Linear(n_latent_var, 2)
+            )
+            self.contrastive_criteria = nn.CrossEntropyLoss()
+        else:
+            self.contrastive_layer = None
+            self.contrastive_criteria = None
+
+        self._n_forward_called = 0
+        self._tf_writer = tf_writer
+
+
     @retry(stop=stop_after_attempt(10), wait=wait_random(5, 30))
     def _load_transformer_model(self, name: str):
         return AutoModel.from_pretrained(name)
@@ -173,16 +192,11 @@ class EMMA(nn.Module):
         weighted_vals = weights.unsqueeze(-1) * value.unsqueeze(1).unsqueeze(1).unsqueeze(1)
         return torch.mean(weighted_vals, dim=-2), weights
 
-    # def forward(self, obs, manual):
-    def forward(self, obs, manual=None, entity=None, avatar=None):
-        
+    def forward(self, obs, manual=None):
+
         if self.forward_type == 'original':
             # The original forward does not expect batch dimension
             if manual is None:
-                raise ValueError()
-            if entity is not None:
-                raise ValueError()
-            if avatar is not None:
                 raise ValueError()
 
             entity_obs = obs["entities"]
@@ -198,10 +212,39 @@ class EMMA(nn.Module):
             temb = temb.unsqueeze(0)
 
         elif self.forward_type == 'pfrl':
+            if manual is not None:
+                raise ValueError()
             manual, entity_obs, avatar_obs = obs
             temb = manual
         else:
             raise ValueError()
+
+        if self.do_contrastive_learning and torch.is_grad_enabled():
+            # if str(self.contrastive_criteria.device) != str(entity_obs.device):
+            #     self.contrastive_criteria = self.contrastive_criteria.to(entity_obs.device)
+            contrastive_criteria = self.contrastive_criteria.to(temb.device)
+
+            negative_temb = temb[torch.randperm(temb.shape[0])]
+            _, _, negative_logits = self._forward(entity_obs, avatar_obs, negative_temb)
+            negative_labels = torch.zeros(negative_logits.shape[0], dtype=torch.int64).to(negative_logits.device)
+            contrastive_loss = contrastive_criteria(negative_logits, negative_labels)
+
+            action_probs, value, positive_logits = self._forward(entity_obs, avatar_obs, temb)
+            positive_labels = torch.ones(negative_logits.shape[0], dtype=torch.int64).to(negative_logits.device)
+            contrastive_loss += contrastive_criteria(positive_logits, positive_labels)
+
+            contrastive_loss.backward(retain_graph=True)
+            if self._tf_writer is not None:
+                self._tf_writer.add_scalar('agent/contrastive_loss',
+                                           contrastive_loss.cpu().detach().numpy().item(),
+                                           self._n_forward_called)
+        else:
+            action_probs, value, _ = self._forward(entity_obs, avatar_obs, temb)
+
+        self._n_forward_called += 1
+        return action_probs, value
+
+    def _forward(self, entity_obs, avatar_obs, temb):
 
         batch_size = entity_obs.shape[0]
 
@@ -242,6 +285,10 @@ class EMMA(nn.Module):
         obs_emb = obs_emb.reshape(batch_size, -1)
         action_probs = self.action_layer(obs_emb)
         value = self.value_layer(obs_emb)
+        if self.do_contrastive_learning:
+            contrastive_logits = self.contrastive_layer(obs_emb)
+        else:
+            contrastive_logits = None
 
         if self.forward_type == 'original':
             actions = torch.argmax(action_probs, dim=1)
@@ -250,6 +297,6 @@ class EMMA(nn.Module):
                            for _ in range(0, batch_size)]
             return actions[0]
         elif self.forward_type == 'pfrl':
-            return action_probs, value
+            return action_probs, value, contrastive_logits
         else:
             raise ValueError()
