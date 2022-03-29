@@ -11,6 +11,9 @@ from torch.distributions import Categorical
 from numpy import sqrt as sqrt
 from transformers import AutoModel, AutoTokenizer
 from tenacity import retry, stop_after_attempt, wait_random
+from self_attention_cv import MultiHeadSelfAttention
+# from self_attention_cv.pos_embeddings import AbsPosEmb1D, RelPosEmb1D
+from self_attention_cv.pos_embeddings import PositionalEncodingSin
 
 from messenger.models.utils import nonzero_mean, Encoder
 
@@ -28,6 +31,8 @@ class EMMA(nn.Module):
             kernel_size=2,
             n_hidden_layers=1,
             forward_type='original',
+            do_image_self_attention=False,
+            image_self_attention_heads=4,
             # device=None
     ):
 
@@ -40,6 +45,22 @@ class EMMA(nn.Module):
             hist_len * 256,
             f_maps,
             kernel_size)  # conv layer
+
+        self.do_image_self_attention = do_image_self_attention
+        if self.do_image_self_attention:
+            self.image_self_attention = MultiHeadSelfAttention(dim=f_maps, heads=image_self_attention_heads)
+
+            num_image_tokens = (state_h - 1) * (state_w - 1)
+            self.image_pos_emb = PositionalEncodingSin(dim=f_maps, max_tokens=num_image_tokens)
+            # The output tensor shape of the following classes are somewhat unexpected.
+            # self.image_pos_emb = RelPosEmb1D(tokens = num_image_tokens,
+            #                                  dim_head=f_maps,
+            #                                  heads=1)
+            # self.image_pos_emb = AbsPosEmb1D(tokens = num_image_tokens,
+            #                                  dim_head=f_maps)
+        else:
+            self.image_self_attention = None
+            self.image_pos_emb = None
 
         self.state_h = state_h
         self.state_w = state_w
@@ -189,8 +210,15 @@ class EMMA(nn.Module):
 
         # permute from HWC to NCHW and do convolution
         obs_emb = obs_emb.permute(0, 3, 1, 2)
-        obs_emb = F.leaky_relu(self.conv(obs_emb)).reshape(batch_size, -1)
+        obs_emb = F.leaky_relu(self.conv(obs_emb))
 
+        if self.do_image_self_attention:
+            obs_token_embs = obs_emb.view(obs_emb.shape[0], obs_emb.shape[1], -1).permute(0, 2, 1)
+            obs_token_embs = self.image_pos_emb(obs_token_embs)
+            obs_token_embs = self.image_self_attention(obs_token_embs)
+            obs_emb = obs_token_embs.permute(0, 2, 1).reshape(*obs_emb.shape)
+
+        obs_emb = obs_emb.reshape(batch_size, -1)
         action_probs = self.action_layer(obs_emb)
         value = self.value_layer(obs_emb)
 

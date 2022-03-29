@@ -15,6 +15,8 @@ setuptools.setup(
         'vgdl@git+https://github.com/HonoMi/py-vgdl.git@honoka_dev',
         'pygame',
         'tenacity',
+        # 'self-attention-cv',
+        'self_attention_cv@git+https://github.com/HonoMi/self-attention-cv.git@honoka-dev',
         'transformers>=4.2',
         'torch>=1.3',
     ],
