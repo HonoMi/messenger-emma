@@ -78,6 +78,8 @@ class Encoder:
         self.max_length = max_length  # max sentence length
         self.cache = {}
 
+        self.to(device)
+
     def to(self, device):
         self.device = device
         self.encoder = self.encoder.to(device)
@@ -89,18 +91,18 @@ class Encoder:
             tok_device[key] = tokens[key].to(self.device)
         return tok_device
 
-    def encode(self, text: List[str]):
+    def encode(self, sentences: List[str]):
         '''
-        Encodes the text using self.encoder and self.tokenizer. Text should be
+        Encodes the sentences using self.encoder and self.tokenizer. Text should be
         a list of sents, where sent is a string.
         '''
         encoded = []  # the final encoded texts
-        for sent in text:
+        for sent in sentences:
             if sent in self.cache.keys():  # sentence is in cache
                 encoded.append(self.cache[sent])
             else:
                 with torch.no_grad():
-                    tokens = self.tokenizer(
+                    tokens_in_sentence = self.tokenizer(
                         sent,
                         return_tensors="pt",
                         truncation=False,
@@ -109,7 +111,7 @@ class Encoder:
                         max_length=self.max_length
                     )
                     emb = self.encoder(
-                        **self.tokens_to_device(tokens)).last_hidden_state
+                        **self.tokens_to_device(tokens_in_sentence)).last_hidden_state
                 encoded.append(emb)
                 self.cache[sent] = emb
         return torch.cat(encoded, dim=0)

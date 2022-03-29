@@ -7,7 +7,6 @@ import random
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from torch.distributions import Categorical
 from numpy import sqrt as sqrt
 from transformers import AutoModel, AutoTokenizer
 from tenacity import retry, stop_after_attempt, wait_random
@@ -51,7 +50,7 @@ class EMMA(nn.Module):
             do_text_attention_after_conv=False,
             do_contrastive_learning=False,
             tf_writer=None,
-            # device=None
+            device='cuda',
     ):
 
         super().__init__()
@@ -136,13 +135,13 @@ class EMMA(nn.Module):
         self.forward_type = forward_type
 
         # get the text encoder
-        text_model = self._load_transformer_model('bert-base-uncased')
+        text_model = nn.DataParallel(self._load_transformer_model('bert-base-uncased'))
         tokenizer = self._load_transformer_tokenizer('bert-base-uncased')
         self.encoder = Encoder(
             model=text_model,
             tokenizer=tokenizer,
             # device=self.device
-            device='cpu',
+            device=device,
         )
         # self.to(device)
 
